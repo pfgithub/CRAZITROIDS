@@ -1,5 +1,17 @@
-=== ZIGSTEROIDS (aka. LARGE SPACE ROCKS) ===
+CRAZITROIDS
 
-A poorly done Zig implementation of the classic 1979 arcade game Asteroids.
+fork of https://github.com/jdah/zigsteroids
 
-Done live on stream 16/March 2024 - https://www.youtube.com/watch?v=ajbYYgbDXGk
+```
+# zig 0.11.0
+git submodule update --init --recursive
+zig build run
+```
+
+controls:
+
+```
+mouse to look
+left click to shoot
+w to forwards
+```

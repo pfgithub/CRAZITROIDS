@@ -131,17 +131,39 @@ const Sound = struct {
 };
 var sound: Sound = undefined;
 
-fn drawLines(org: Vector2, scale: f32, rot: f32, points: []const Vector2, connect: bool) void {
+fn centerOffset() Vector2 {
+    return rlm.vector2Subtract(rlm.vector2Scale(SIZE, 0.5), state.ship.pos);
+}
+const draw_offsets: []const Vector2 = &.{
+    rl.Vector2.init(-SIZE.x, -SIZE.y),
+    rl.Vector2.init(-SIZE.x, 0),
+    rl.Vector2.init(-SIZE.x, SIZE.y),
+    rl.Vector2.init(0, -SIZE.y),
+    rl.Vector2.init(0, 0),
+    rl.Vector2.init(0, SIZE.y),
+    rl.Vector2.init(SIZE.x, -SIZE.y),
+    rl.Vector2.init(SIZE.x, 0),
+    rl.Vector2.init(SIZE.x, SIZE.y),
+};
+fn drawLines(org: Vector2, scale: f32, rot: f32, points: []const Vector2, connect: bool, ui: bool) void {
+    for(draw_offsets) |offset| {
+        drawLines_inner(rlm.vector2Add(org, offset), scale, rot, points, connect, ui);
+    }
+}
+fn drawLines_inner(org: Vector2, scale: f32, rot: f32, points: []const Vector2, connect: bool, ui: bool) void {
     const Transformer = struct {
         org: Vector2,
         scale: f32,
         rot: f32,
+        ui: bool,
 
         fn apply(self: @This(), p: Vector2) Vector2 {
-            return rlm.vector2Add(
+            const res = rlm.vector2Add(
                 rlm.vector2Scale(rlm.vector2Rotate(p, self.rot), self.scale),
                 self.org,
             );
+            if(!self.ui) return rlm.vector2Add(res, centerOffset());
+            return res;
         }
     };
 
@@ -149,6 +171,7 @@ fn drawLines(org: Vector2, scale: f32, rot: f32, points: []const Vector2, connec
         .org = org,
         .scale = scale,
         .rot = rot,
+        .ui = ui,
     };
 
     const bound = if (connect) points.len else (points.len - 1);
@@ -196,7 +219,7 @@ fn drawNumber(n: usize, pos: Vector2) !void {
             try points.append(Vector2.init(p[0] - 0.5, (1.0 - p[1]) - 0.5));
         }
 
-        drawLines(pos2, SCALE * 0.8, 0, points.slice(), false);
+        drawLines(pos2, SCALE * 0.8, 0, points.slice(), false, true);
         pos2.x -= SCALE;
         val /= 10;
         if (val == 0) {
@@ -265,7 +288,7 @@ fn drawAsteroid(pos: Vector2, size: AsteroidSize, seed: u64) !void {
         );
     }
 
-    drawLines(pos, size.size(), 0.0, points.slice(), true);
+    drawLines(pos, size.size(), 0.0, points.slice(), true, false);
 }
 
 fn splatLines(pos: Vector2, count: usize) !void {
@@ -356,16 +379,14 @@ fn update() !void {
 
     if (!state.ship.isDead()) {
         // rotations / second
-        const ROT_SPEED = 2;
+        // const ROT_SPEED = 2;
         const SHIP_SPEED = 24;
 
-        if (rl.isKeyDown(.key_a)) {
-            state.ship.rot -= state.delta * math.tau * ROT_SPEED;
-        }
-
-        if (rl.isKeyDown(.key_d)) {
-            state.ship.rot += state.delta * math.tau * ROT_SPEED;
-        }
+        const mouse_pos = rl.getMousePosition();
+        const center_pos = rlm.vector2Scale(SIZE, 0.5);
+        const diff = rlm.vector2Subtract(center_pos, mouse_pos);
+        const rot_v = rlm.vector2Angle(diff, Vector2.init(0.0, -1.0));
+        state.ship.rot = -rot_v;
 
         const dirAngle = state.ship.rot + (math.pi * 0.5);
         const shipDir = Vector2.init(math.cos(dirAngle), math.sin(dirAngle));
@@ -626,14 +647,14 @@ fn drawAlien(pos: Vector2, size: AlienSize) void {
         Vector2.init(-0.3, -0.3),
         Vector2.init(-0.5, 0.0),
         Vector2.init(0.5, 0.0),
-    }, false);
+    }, false, false);
 
     drawLines(pos, SCALE * scale, 0, &.{
         Vector2.init(-0.2, -0.3),
         Vector2.init(-0.1, -0.5),
         Vector2.init(0.1, -0.5),
         Vector2.init(0.2, -0.3),
-    }, false);
+    }, false, false);
 }
 
 const SHIP_LINES = [_]Vector2{
@@ -653,6 +674,7 @@ fn render() !void {
             -math.pi,
             &SHIP_LINES,
             true,
+            true,
         );
     }
 
@@ -666,6 +688,7 @@ fn render() !void {
             state.ship.rot,
             &SHIP_LINES,
             true,
+            false,
         );
 
         if (rl.isKeyDown(.key_w) and @mod(@as(i32, @intFromFloat(state.now * 20)), 2) == 0) {
@@ -679,6 +702,7 @@ fn render() !void {
                     Vector2.init(0.3, -0.4),
                 },
                 true,
+                false,
             );
         }
     }
@@ -703,16 +727,21 @@ fn render() !void {
                         Vector2.init(0.5, 0),
                     },
                     true,
+                    false,
                 );
             },
             .DOT => |dot| {
-                rl.drawCircleV(p.pos, dot.radius, rl.Color.white);
+                for(draw_offsets) |draw_offset| {
+                    rl.drawCircleV(rlm.vector2Add(rlm.vector2Add(p.pos, centerOffset()), draw_offset), dot.radius, rl.Color.white);
+                }
             },
         }
     }
 
     for (state.projectiles.items) |p| {
-        rl.drawCircleV(p.pos, @max(SCALE * 0.05, 1), rl.Color.white);
+        for(draw_offsets) |draw_offset| {
+            rl.drawCircleV(rlm.vector2Add(rlm.vector2Add(p.pos, centerOffset()), draw_offset), @max(SCALE * 0.05, 1), rl.Color.white);
+        }
     }
 }
 
